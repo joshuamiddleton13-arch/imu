@@ -74,6 +74,7 @@ a = datetime.datetime.now()
 starting_time = datetime.datetime.now()
 
 string_list = []
+cwd = os.getcwd()
 
 while (a - starting_time).total_seconds() < 30.0:
     #Read the accelerometer,gyroscope and magnetometer values
@@ -201,6 +202,6 @@ while (a - starting_time).total_seconds() < 30.0:
     #slow program down a bit, makes the output more readable
     time.sleep(0.03)
 
-with open('output_test.txt', 'w') as file:
+with open(cwd + '/output_test.txt', 'w') as file:
     for string in string_list:
         file.write(string + '\n')
