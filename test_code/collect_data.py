@@ -345,7 +345,7 @@ kalmanY = 0.0
 a = datetime.datetime.now()
 starting_time = datetime.datetime.now()
 
-string_list = [["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]]
+string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
 cwd = os.getcwd()
 
 bmp388 = BMP388()
