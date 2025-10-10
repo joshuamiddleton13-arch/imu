@@ -10,12 +10,11 @@ import smbus
 
 
 def monitor_connected() -> bool:
-    try:
-        result = subprocess.run(["tvservice", "-s"], capture_output=True, text=True)
-        print(result)
-        return "HDMI" in result.stdout and "disconnected" not in result.stdout
-    except Exception:
-        return False
+    
+    result = subprocess.run(["tvservice", "-s"], capture_output=True, text=True)
+    print(result)
+    return "HDMI" in result.stdout and "disconnected" not in result.stdout
+
         
 
 # define BMP388 Device I2C address
