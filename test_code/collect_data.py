@@ -7,9 +7,7 @@ import sys
 import subprocess
 import smbus
 
-#ghp_T01uWYvFm3tjZCHgs
 
-#kB5E0SyhGDM5U3pCKzq
 
 def monitor_connected() -> bool:
     try:
