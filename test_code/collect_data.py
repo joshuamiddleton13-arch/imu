@@ -353,7 +353,7 @@ cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while (a - starting_time).total_seconds() < 300.0:
+while (a - starting_time).total_seconds() < 600.0:
 
 
     #Read the accelerometer,gyroscope and magnetometer values
