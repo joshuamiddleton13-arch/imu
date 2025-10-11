@@ -441,5 +441,5 @@ with open(cwd + '/output_test.csv', 'w') as file:
         file.write(string + '\n')
         
 time.sleep(2.0)
-os.system("sudo shutdown now")
+#os.system("sudo shutdown now")
         
