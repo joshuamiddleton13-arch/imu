@@ -353,7 +353,7 @@ cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while (a - starting_time).total_seconds() < 10.0:
+while (a - starting_time).total_seconds() < 570.0:
 
 
     #Read the accelerometer,gyroscope and magnetometer values
@@ -440,6 +440,6 @@ with open('/home/mmidd/imu/test_code/output_test.csv', 'w') as file:
     for string in string_list:
         file.write(string + '\n')
         
-time.sleep(2.0)
-#os.system("sudo shutdown now")
+time.sleep(30.0)
+os.system("sudo shutdown now")
         
