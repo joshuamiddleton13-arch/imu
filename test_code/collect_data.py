@@ -353,7 +353,7 @@ cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while (a - starting_time).total_seconds() < 600.0:
+while (a - starting_time).total_seconds() < 60.0:
 
 
     #Read the accelerometer,gyroscope and magnetometer values
@@ -436,7 +436,7 @@ while (a - starting_time).total_seconds() < 600.0:
     #slow program down a bit, makes the output more readable
     time.sleep(0.03)
 
-with open(cwd + '/output_test.csv', 'w') as file:
+with open('home/mmidd/imu/test_code/output_test.csv', 'w') as file:
     for string in string_list:
         file.write(string + '\n')
         
