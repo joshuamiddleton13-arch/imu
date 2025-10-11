@@ -9,13 +9,6 @@ import smbus
 
 
 
-def monitor_connected() -> bool:
-    
-    result = subprocess.run(["tvservice", "-s"], capture_output=True, text=True)
-    print(result)
-    return "HDMI" in result.stdout and "disconnected" not in result.stdout
-
-        
 
 # define BMP388 Device I2C address
 
@@ -338,119 +331,115 @@ def kalmanFilterX ( accAngle, gyroRate, DT):
 
     return KFangleX
 
-if monitor_connected():
-    print("monitor connected, skipping auto task")
 
-else: # run auto task
 
-    IMU.detectIMU()     #Detect if BerryIMU is connected.
-    if(IMU.BerryIMUversion == 99):
-        print(" No BerryIMU found... exiting ")
-        sys.exit()
-    IMU.initIMU()       #Initialise the accelerometer, gyroscope and compass
-    
-    gyroXangle = 0.0
-    gyroYangle = 0.0
-    gyroZangle = 0.0
-    kalmanX = 0.0
-    kalmanY = 0.0
-    
+IMU.detectIMU()     #Detect if BerryIMU is connected.
+if(IMU.BerryIMUversion == 99):
+    print(" No BerryIMU found... exiting ")
+    sys.exit()
+IMU.initIMU()       #Initialise the accelerometer, gyroscope and compass
+
+gyroXangle = 0.0
+gyroYangle = 0.0
+gyroZangle = 0.0
+kalmanX = 0.0
+kalmanY = 0.0
+
+a = datetime.datetime.now()
+starting_time = datetime.datetime.now()
+
+string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
+cwd = os.getcwd()
+
+bmp388 = BMP388()
+
+while (a - starting_time).total_seconds() < 300.0:
+
+
+    #Read the accelerometer,gyroscope and magnetometer values
+    ACCx = IMU.readACCx()
+    ACCy = IMU.readACCy()
+    ACCz = IMU.readACCz()
+    GYRx = IMU.readGYRx()
+    GYRy = IMU.readGYRy()
+    GYRz = IMU.readGYRz()
+    MAGx = IMU.readMAGx()
+    MAGy = IMU.readMAGy()
+    MAGz = IMU.readMAGz()
+
+
+    #Apply compass calibration
+    MAGx -= (magXmin + magXmax) /2
+    MAGy -= (magYmin + magYmax) /2
+    MAGz -= (magZmin + magZmax) /2
+
+
+    ##Calculate loop Period(LP). How long between Gyro Reads
+    b = datetime.datetime.now() - a
     a = datetime.datetime.now()
-    starting_time = datetime.datetime.now()
-    
-    string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
-    cwd = os.getcwd()
-    
-    bmp388 = BMP388()
-    
-    while (a - starting_time).total_seconds() < 120.0:
-    
-    
-        #Read the accelerometer,gyroscope and magnetometer values
-        ACCx = IMU.readACCx()
-        ACCy = IMU.readACCy()
-        ACCz = IMU.readACCz()
-        GYRx = IMU.readGYRx()
-        GYRy = IMU.readGYRy()
-        GYRz = IMU.readGYRz()
-        MAGx = IMU.readMAGx()
-        MAGy = IMU.readMAGy()
-        MAGz = IMU.readMAGz()
-    
-    
-        #Apply compass calibration
-        MAGx -= (magXmin + magXmax) /2
-        MAGy -= (magYmin + magYmax) /2
-        MAGz -= (magZmin + magZmax) /2
-    
-    
-        ##Calculate loop Period(LP). How long between Gyro Reads
-        b = datetime.datetime.now() - a
-        a = datetime.datetime.now()
-        LP = b.microseconds/(1000000*1.0)
-        #outputString = "Loop Time %5.2f " % ( LP )
-        outputString = str((a - starting_time).total_seconds())
-    
-    
-    
-        #Convert Gyro raw to degrees per second
-        rate_gyr_x =  GYRx * G_GAIN
-        rate_gyr_y =  GYRy * G_GAIN
-        rate_gyr_z =  GYRz * G_GAIN
-    
-    
-        #Calculate the angles from the gyro.
-        gyroXangle+=rate_gyr_x*LP
-        gyroYangle+=rate_gyr_y*LP
-        gyroZangle+=rate_gyr_z*LP
-    
-    
-    
-       #Convert Accelerometer values to degrees
-        AccXangle =  (math.atan2(ACCy,ACCz)*RAD_TO_DEG)
-        AccYangle =  (math.atan2(ACCz,ACCx)+M_PI)*RAD_TO_DEG
-    
-        #convert the values to -180 and +180
-        if AccYangle > 90:
-            AccYangle -= 270.0
-        else:
-            AccYangle += 90.0
+    LP = b.microseconds/(1000000*1.0)
+    #outputString = "Loop Time %5.2f " % ( LP )
+    outputString = str((a - starting_time).total_seconds())
+
+
+
+    #Convert Gyro raw to degrees per second
+    rate_gyr_x =  GYRx * G_GAIN
+    rate_gyr_y =  GYRy * G_GAIN
+    rate_gyr_z =  GYRz * G_GAIN
+
+
+    #Calculate the angles from the gyro.
+    gyroXangle+=rate_gyr_x*LP
+    gyroYangle+=rate_gyr_y*LP
+    gyroZangle+=rate_gyr_z*LP
+
+
+
+   #Convert Accelerometer values to degrees
+    AccXangle =  (math.atan2(ACCy,ACCz)*RAD_TO_DEG)
+    AccYangle =  (math.atan2(ACCz,ACCx)+M_PI)*RAD_TO_DEG
+
+    #convert the values to -180 and +180
+    if AccYangle > 90:
+        AccYangle -= 270.0
+    else:
+        AccYangle += 90.0
+
+
+    #Kalman filter used to combine the accelerometer and gyro values.
+    kalmanY = kalmanFilterY(AccYangle, rate_gyr_y,LP)
+    kalmanX = kalmanFilterX(AccXangle, rate_gyr_x,LP)
+
+    temperature,pressure,altitude = bmp388.get_temperature_and_pressure_and_altitude()
+    pressure = pressure/100.0
+    altitude = altitude/100.0
+
+
+    outputString += ","+str(kalmanX)
+    outputString += ","+str(kalmanY)
+    outputString += ","+str(altitude)
+    outputString += ","+str(pressure)
+    outputString += ","+str(ACCx)
+    outputString += ","+str(ACCy)
+    outputString += ","+str(ACCz)
+    outputString += ","+str(GYRx)
+    outputString += ","+str(GYRy)
+    outputString += ","+str(GYRz)
     
     
-        #Kalman filter used to combine the accelerometer and gyro values.
-        kalmanY = kalmanFilterY(AccYangle, rate_gyr_y,LP)
-        kalmanX = kalmanFilterX(AccXangle, rate_gyr_x,LP)
-    
-        temperature,pressure,altitude = bmp388.get_temperature_and_pressure_and_altitude()
-        pressure = pressure/100.0
-        altitude = altitude/100.0
-    
-    
-        outputString += ","+str(kalmanX)
-        outputString += ","+str(kalmanY)
-        outputString += ","+str(altitude)
-        outputString += ","+str(pressure)
-        outputString += ","+str(ACCx)
-        outputString += ","+str(ACCy)
-        outputString += ","+str(ACCz)
-        outputString += ","+str(GYRx)
-        outputString += ","+str(GYRy)
-        outputString += ","+str(GYRz)
+    print(outputString)
+    string_list.append(outputString)
+
+
+
+    #slow program down a bit, makes the output more readable
+    time.sleep(0.03)
+
+with open(cwd + '/output_test.csv', 'w') as file:
+    for string in string_list:
+        file.write(string + '\n')
         
+time.sleep(2.0)
+os.system("sudo shutdown now")
         
-        print(outputString)
-        string_list.append(outputString)
-    
-    
-    
-        #slow program down a bit, makes the output more readable
-        time.sleep(0.03)
-    
-    with open(cwd + '/output_test.csv', 'w') as file:
-        for string in string_list:
-            file.write(string + '\n')
-            
-    time.sleep(2.0)
-    os.system("sudo shutdown now")
-            
-    
