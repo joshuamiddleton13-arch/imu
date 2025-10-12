@@ -348,7 +348,7 @@ kalmanY = 0.0
 a = datetime.datetime.now()
 starting_time = datetime.datetime.now()
 
-string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
+string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,MagX,MagY,MagZ"]
 cwd = os.getcwd()
 
 bmp388 = BMP388()
@@ -426,7 +426,9 @@ while (a - starting_time).total_seconds() < 570.0:
     outputString += ","+str(GYRx)
     outputString += ","+str(GYRy)
     outputString += ","+str(GYRz)
-    
+    outputString += ","+str(MAGx)
+    outputString += ","+str(MAGy)
+    outputString += ","+str(MAGz)
     
     print(outputString)
     string_list.append(outputString)
