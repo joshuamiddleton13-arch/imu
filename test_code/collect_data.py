@@ -4,10 +4,10 @@ import IMU
 import datetime
 import os
 import sys
-import subprocess
 import smbus
+import random
 
-
+# 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
 
 
 # define BMP388 Device I2C address
@@ -348,12 +348,14 @@ kalmanY = 0.0
 a = datetime.datetime.now()
 starting_time = datetime.datetime.now()
 
+time_count = 0
+
 string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,MagX,MagY,MagZ"]
 cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while (a - starting_time).total_seconds() < 870.0:
+while time_count < 750.0:
 
 
     #Read the accelerometer,gyroscope and magnetometer values
@@ -380,7 +382,7 @@ while (a - starting_time).total_seconds() < 870.0:
     LP = b.microseconds/(1000000*1.0)
     #outputString = "Loop Time %5.2f " % ( LP )
     outputString = str((a - starting_time).total_seconds())
-
+    time_count += b.total_seconds()
 
 
     #Convert Gyro raw to degrees per second
@@ -438,7 +440,7 @@ while (a - starting_time).total_seconds() < 870.0:
     #slow program down a bit, makes the output more readable
     time.sleep(0.03)
 
-with open('/home/mmidd/imu/test_code/output_test.csv', 'w') as file:
+with open('/home/mmidd/imu/test_code/output_test_' +str(random.randint(1, 999))+ '.csv', 'w') as file:
     for string in string_list:
         file.write(string + '\n')
         
