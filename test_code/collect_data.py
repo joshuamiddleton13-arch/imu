@@ -355,7 +355,7 @@ cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while time_count < 10.0:
+while time_count < 720.0:
 
 
     #Read the accelerometer,gyroscope and magnetometer values
@@ -445,5 +445,5 @@ with open('/home/mmidd/imu/test_code/output_test_' +str(random.randint(1, 999))+
         file.write(string + '\n')
         
 time.sleep(30.0)
-#os.system("sudo shutdown now")
+os.system("sudo shutdown now")
         
