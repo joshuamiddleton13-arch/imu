@@ -445,5 +445,5 @@ with open('/home/mmidd/imu/test_code/output_test_' +str(random.randint(1, 999))+
         file.write(string + '\n')
         
 time.sleep(30.0)
-os.system("sudo shutdown now")
+#os.system("sudo shutdown now")
         
