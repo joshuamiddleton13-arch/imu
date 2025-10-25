@@ -8,7 +8,11 @@ import math
 import datetime
 import os
 import sys
+
+from fontTools.ttLib.woff2 import bboxFormat
+
 matplotlib.use('TkAgg')
+from whittaker_eilers import WhittakerSmoother
 
 
 def extract_nonzero_segments(vec):
@@ -173,8 +177,6 @@ comp_x = []
 comp_y = []
 
 for i in range(len(time)):
-    
-
 
     #Read the accelerometer,gyroscope and magnetometer values
     ACCx = Ax[i]
@@ -184,28 +186,19 @@ for i in range(len(time)):
     GYRy = Gy[i]
     GYRz = Gz[i]
 
-
-
     ##Calculate loop Period(LP). How long between Gyro Reads
-
     LP = time[i] - t_prev
     t_prev = time[i]
-
-
-
 
     #Convert Gyro raw to degrees per second
     rate_gyr_x =  GYRx * G_GAIN
     rate_gyr_y =  GYRy * G_GAIN
     rate_gyr_z =  GYRz * G_GAIN
 
-
     #Calculate the angles from the gyro.
     gyroXangle+=rate_gyr_x*LP
     gyroYangle+=rate_gyr_y*LP
     gyroZangle+=rate_gyr_z*LP
-
-
 
    #Convert Accelerometer values to degrees
     AccXangle =  (math.atan2(ACCy,ACCz)*RAD_TO_DEG)
@@ -216,7 +209,6 @@ for i in range(len(time)):
         AccYangle -= 270.0
     else:
         AccYangle += 90.0
-
 
     #Complementary filter used to combine the accelerometer and gyro values.
     CFangleX=AA*(CFangleX+rate_gyr_x*LP) +(1 - AA) * AccXangle
@@ -233,11 +225,7 @@ for i in range(len(time)):
     comp_x.append(CFangleX)
     comp_y.append(CFangleY)
 
-
-from whittaker_eilers import WhittakerSmoother
-
 print(df)
-
 
 
 # first do angle measurement
@@ -249,16 +237,19 @@ steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 print(steady_state_angle)
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
 
-plt.figure()
-plt.plot(time, smoothed_kalman_x)
-
+#plt.figure()
+#plt.plot(time, smoothed_kalman_x)
 
 whittaker_smoother = WhittakerSmoother(lmbda=1000000, order=2, data_length=len(df["Altitude"].to_numpy()))
 smoothed_alt = whittaker_smoother.smooth(df["Altitude"].to_numpy())
 
-plt.figure()
-plt.plot(time, smoothed_alt, color = 'blue')
-#plt.show()
+#plt.figure()
+#plt.plot(time, smoothed_alt, color = 'blue')
+
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
+ax.plot(time, smoothed_alt, color = 'blue')
+
 
 #combined metric
 tilt_threshold = -4.0 # degrees
@@ -284,6 +275,8 @@ for i in range(len(time_intervals)):
         index += 1
 
 # do linear regression to find slope and average rise
+floor_increase_counter = 0
+floor_map ={0:'G', 1:'G1', 2:'1', 3:'2', 4:'3', 5:'4', 6:'5', 7:'6', 8:'7', 9:'8'}
 for i in range(len(time_intervals)):
     # linear least squares to find average trend of rise points:
     X = np.array([time_intervals[i], np.ones(len(time_intervals[i]))]).transpose()
@@ -297,34 +290,28 @@ for i in range(len(time_intervals)):
     for x in plot_x:
         plot_y.append(B[0]*x + B[1])
 
-    plt.plot(plot_x, plot_y, color = 'green')
+    ax.plot(plot_x, plot_y, color = 'green')
 
 
     if(plot_y[-1] - plot_y[0] > height_threshold):
-        plt.plot([time_intervals[i][0], time_intervals[i][-1]],[rise_intervals[i].mean(), rise_intervals[i].mean()], color = 'red')
+        floor_increase_counter += 1
+        ax.plot([time_intervals[i][0], time_intervals[i][-1]],[rise_intervals[i].mean(), rise_intervals[i].mean()], color = 'red')
 
-#plt.plot(time, rise_intervals)
-plt.show()
+ax.text(500,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
+fig.savefig("data_plot.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+#plt.show()
 
-'''
-df = pd.read_csv("output_test_996.csv")
+# make some images for ops code:
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
 
+ax.text(.5,.5,"Collecting Data", ha='center', fontsize=14, family="monospace")
+ax.axis('off')
+fig.savefig("collecting_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
 
-print(df)
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
 
-plt.figure()
-plt.plot(df["Time"], df["Altitude"])
-plt.ylabel("Alt")
-
-
-kalmanx = df["KalmanX"].to_numpy() - 2.5
-plt.figure()
-plt.plot(df["Time"], kalmanx)
-plt.ylabel("X")
-
-
-plt.figure()
-plt.plot(df["Time"], df["KalmanY"])
-plt.ylabel("Y")
-plt.show()
-'''
+ax.text(.5,.5,"Processing Data", ha='center', fontsize=14, family="monospace")
+ax.axis('off')
+fig.savefig("processing_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)

@@ -5,7 +5,16 @@ import datetime
 import os
 import sys
 import smbus
-import random
+
+from whittaker_eilers import WhittakerSmoother
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+import spidev as SPI
+sys.path.append("..")
+from lib import LCD_2inch
+from PIL import Image,ImageDraw,ImageFont
 
 # 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
 
@@ -67,8 +76,10 @@ BMP388_REG_ADD_P9_MSB = 0x43
 BMP388_REG_ADD_P10 = 0x44
 BMP388_REG_ADD_P11 = 0x45
 
+
 class BMP388(object):
     """docstring for BMP388"""
+
     def __init__(self, address=I2C_ADD_BMP388):
         self._address = address
         self._bus = smbus.SMBus(0x01)
@@ -83,7 +94,7 @@ class BMP388(object):
                                  BMP388_REG_VAL_SOFT_RESET)
                 time.sleep(0.01)
         else:
-            print ("Pressure sersor NULL!\r\n")
+            print("Pressure sersor NULL!\r\n")
         self._write_byte(BMP388_REG_ADD_PWR_CTRL,
                          BMP388_REG_VAL_PRESS_EN
                          | BMP388_REG_VAL_TEMP_EN
@@ -114,7 +125,7 @@ class BMP388(object):
         self._bus.write_byte_data(self._address, cmd, val)
 
     def _load_calibration(self):
-        print ("_load_calibration\r\n")
+        print("_load_calibration\r\n")
         self.T1 = self._read_u16(BMP388_REG_ADD_T1_LSB)
         self.T2 = self._read_u16(BMP388_REG_ADD_T2_LSB)
         self.T3 = self._read_s8(BMP388_REG_ADD_T3)
@@ -149,13 +160,13 @@ class BMP388(object):
         partial_data5 = self.P7 * partial_data1 * 0x10
         partial_data6 = self.P6 * self.T_fine * 4194304
         offset = self.P5 * 140737488355328 + partial_data4 \
-            + partial_data5 + partial_data6
+                 + partial_data5 + partial_data6
 
         partial_data2 = self.P4 * partial_data3 / 0x20
         partial_data4 = self.P3 * partial_data1 * 0x04
         partial_data5 = (self.P2 - 16384) * self.T_fine * 2097152
         sensitivity = (self.P1 - 16384) * 70368744177664 \
-            + partial_data2 + partial_data4 + partial_data5
+                      + partial_data2 + partial_data4 + partial_data5
 
         partial_data1 = sensitivity / 16777216 * adc_P
         partial_data2 = self.P10 * self.T_fine
@@ -166,7 +177,7 @@ class BMP388(object):
         partial_data2 = self.P11 * partial_data6 / 65536
         partial_data3 = partial_data2 * adc_P / 128
         partial_data4 = offset / 0x04 + partial_data1 + partial_data5 \
-            + partial_data3
+                        + partial_data3
         comp_press = partial_data4 * 25 / 1099511627776
         return comp_press
 
@@ -185,7 +196,7 @@ class BMP388(object):
         adc_P = (msb << 0x10) + (lsb << 0x08) + xlsb
         pressure = self.compensate_pressure(adc_P)
         altitude = 4433000 * (0x01 - pow(pressure / 100.0 / 101325.0,
-                              0.1903))
+                                         0.1903))
 
         return (temperature, pressure, altitude)
 
@@ -193,18 +204,16 @@ class BMP388(object):
 RAD_TO_DEG = 57.29578
 M_PI = 3.14159265358979323846
 G_GAIN = 0.070  # [deg/s/LSB]  If you change the dps for gyro, you need to update this value accordingly
-AA =  0.40      # Complementary filter constant
+AA = 0.40  # Complementary filter constant
 
+magXmin = 0
+magYmin = 0
+magZmin = 0
+magXmax = 0
+magYmax = 0
+magZmax = 0
 
-magXmin =  0
-magYmin =  0
-magZmin =  0
-magXmax =  0
-magYmax =  0
-magZmax =  0
-
-
-#Kalman filter variables
+# Kalman filter variables
 Q_angle = 0.01
 Q_gyro = 0.0015
 R_angle = 0.005
@@ -222,9 +231,9 @@ KFangleX = 0.0
 KFangleY = 0.0
 
 
-def kalmanFilterY ( accAngle, gyroRate, DT):
-    y=0.0
-    S=0.0
+def kalmanFilterY(accAngle, gyroRate, DT):
+    y = 0.0
+    S = 0.0
 
     global KFangleY
     global Q_angle
@@ -237,29 +246,30 @@ def kalmanFilterY ( accAngle, gyroRate, DT):
 
     KFangleY = KFangleY + DT * (gyroRate - y_bias)
 
-    YP_00 = YP_00 + ( - DT * (YP_10 + YP_01) + Q_angle * DT )
-    YP_01 = YP_01 + ( - DT * YP_11 )
-    YP_10 = YP_10 + ( - DT * YP_11 )
-    YP_11 = YP_11 + ( + Q_gyro * DT )
+    YP_00 = YP_00 + (- DT * (YP_10 + YP_01) + Q_angle * DT)
+    YP_01 = YP_01 + (- DT * YP_11)
+    YP_10 = YP_10 + (- DT * YP_11)
+    YP_11 = YP_11 + (+ Q_gyro * DT)
 
     y = accAngle - KFangleY
     S = YP_00 + R_angle
     K_0 = YP_00 / S
     K_1 = YP_10 / S
 
-    KFangleY = KFangleY + ( K_0 * y )
-    y_bias = y_bias + ( K_1 * y )
+    KFangleY = KFangleY + (K_0 * y)
+    y_bias = y_bias + (K_1 * y)
 
-    YP_00 = YP_00 - ( K_0 * YP_00 )
-    YP_01 = YP_01 - ( K_0 * YP_01 )
-    YP_10 = YP_10 - ( K_1 * YP_00 )
-    YP_11 = YP_11 - ( K_1 * YP_01 )
+    YP_00 = YP_00 - (K_0 * YP_00)
+    YP_01 = YP_01 - (K_0 * YP_01)
+    YP_10 = YP_10 - (K_1 * YP_00)
+    YP_11 = YP_11 - (K_1 * YP_01)
 
     return KFangleY
 
-def kalmanFilterX ( accAngle, gyroRate, DT):
-    x=0.0
-    S=0.0
+
+def kalmanFilterX(accAngle, gyroRate, DT):
+    x = 0.0
+    S = 0.0
 
     global KFangleX
     global Q_angle
@@ -270,37 +280,52 @@ def kalmanFilterX ( accAngle, gyroRate, DT):
     global XP_10
     global XP_11
 
-
     KFangleX = KFangleX + DT * (gyroRate - x_bias)
 
-    XP_00 = XP_00 + ( - DT * (XP_10 + XP_01) + Q_angle * DT )
-    XP_01 = XP_01 + ( - DT * XP_11 )
-    XP_10 = XP_10 + ( - DT * XP_11 )
-    XP_11 = XP_11 + ( + Q_gyro * DT )
+    XP_00 = XP_00 + (- DT * (XP_10 + XP_01) + Q_angle * DT)
+    XP_01 = XP_01 + (- DT * XP_11)
+    XP_10 = XP_10 + (- DT * XP_11)
+    XP_11 = XP_11 + (+ Q_gyro * DT)
 
     x = accAngle - KFangleX
     S = XP_00 + R_angle
     K_0 = XP_00 / S
     K_1 = XP_10 / S
 
-    KFangleX = KFangleX + ( K_0 * x )
-    x_bias = x_bias + ( K_1 * x )
+    KFangleX = KFangleX + (K_0 * x)
+    x_bias = x_bias + (K_1 * x)
 
-    XP_00 = XP_00 - ( K_0 * XP_00 )
-    XP_01 = XP_01 - ( K_0 * XP_01 )
-    XP_10 = XP_10 - ( K_1 * XP_00 )
-    XP_11 = XP_11 - ( K_1 * XP_01 )
+    XP_00 = XP_00 - (K_0 * XP_00)
+    XP_01 = XP_01 - (K_0 * XP_01)
+    XP_10 = XP_10 - (K_1 * XP_00)
+    XP_11 = XP_11 - (K_1 * XP_01)
 
     return KFangleX
 
+# setup code for display:
+RST = 27
+DC = 25
+BL = 18
+bus = 0
+device = 0
+disp = LCD_2inch.LCD_2inch()
+# Initialize library.
+disp.Init()
+# Clear display.
+disp.clear()
+#Set the backlight to 100
+disp.bl_DutyCycle(50)
+image = Image.open('/home/mmidd/imu/test_code/collecting_data.png')
+disp.ShowImage(image)
 
-
-IMU.detectIMU()     #Detect if BerryIMU is connected.
-if(IMU.BerryIMUversion == 99):
+#setup code for imu:
+IMU.detectIMU()  # Detect if BerryIMU is connected.
+if (IMU.BerryIMUversion == 99):
     print(" No BerryIMU found... exiting ")
     sys.exit()
-IMU.initIMU()       #Initialise the accelerometer, gyroscope and compass
+IMU.initIMU()  # Initialise the accelerometer, gyroscope and compass
 
+# logging variables:
 gyroXangle = 0.0
 gyroYangle = 0.0
 gyroZangle = 0.0
@@ -317,10 +342,13 @@ cwd = os.getcwd()
 
 bmp388 = BMP388()
 
-while time_count < 720.0:
+kalmanx_vector = []
+altitude_vector = []
+time_vector = []
 
+while time_count < 60.0:
 
-    #Read the accelerometer,gyroscope and magnetometer values
+    # Read the accelerometer,gyroscope and magnetometer values
     ACCx = IMU.readACCx()
     ACCy = IMU.readACCy()
     ACCz = IMU.readACCz()
@@ -331,80 +359,153 @@ while time_count < 720.0:
     MAGy = IMU.readMAGy()
     MAGz = IMU.readMAGz()
 
-
-    #Apply compass calibration
-    MAGx -= (magXmin + magXmax) /2
-    MAGy -= (magYmin + magYmax) /2
-    MAGz -= (magZmin + magZmax) /2
-
+    # Apply compass calibration
+    MAGx -= (magXmin + magXmax) / 2
+    MAGy -= (magYmin + magYmax) / 2
+    MAGz -= (magZmin + magZmax) / 2
 
     ##Calculate loop Period(LP). How long between Gyro Reads
     b = datetime.datetime.now() - a
     a = datetime.datetime.now()
-    LP = b.microseconds/(1000000*1.0)
-    #outputString = "Loop Time %5.2f " % ( LP )
+    LP = b.microseconds / (1000000 * 1.0)
+    # outputString = "Loop Time %5.2f " % ( LP )
     outputString = str((a - starting_time).total_seconds())
     time_count += b.total_seconds()
 
+    # Convert Gyro raw to degrees per second
+    rate_gyr_x = GYRx * G_GAIN
+    rate_gyr_y = GYRy * G_GAIN
+    rate_gyr_z = GYRz * G_GAIN
 
-    #Convert Gyro raw to degrees per second
-    rate_gyr_x =  GYRx * G_GAIN
-    rate_gyr_y =  GYRy * G_GAIN
-    rate_gyr_z =  GYRz * G_GAIN
+    # Calculate the angles from the gyro.
+    gyroXangle += rate_gyr_x * LP
+    gyroYangle += rate_gyr_y * LP
+    gyroZangle += rate_gyr_z * LP
 
+    # Convert Accelerometer values to degrees
+    AccXangle = (math.atan2(ACCy, ACCz) * RAD_TO_DEG)
+    AccYangle = (math.atan2(ACCz, ACCx) + M_PI) * RAD_TO_DEG
 
-    #Calculate the angles from the gyro.
-    gyroXangle+=rate_gyr_x*LP
-    gyroYangle+=rate_gyr_y*LP
-    gyroZangle+=rate_gyr_z*LP
-
-
-
-   #Convert Accelerometer values to degrees
-    AccXangle =  (math.atan2(ACCy,ACCz)*RAD_TO_DEG)
-    AccYangle =  (math.atan2(ACCz,ACCx)+M_PI)*RAD_TO_DEG
-
-    #convert the values to -180 and +180
+    # convert the values to -180 and +180
     if AccYangle > 90:
         AccYangle -= 270.0
     else:
         AccYangle += 90.0
 
+    # Kalman filter used to combine the accelerometer and gyro values.
+    kalmanY = kalmanFilterY(AccYangle, rate_gyr_y, LP)
+    kalmanX = kalmanFilterX(AccXangle, rate_gyr_x, LP)
 
-    #Kalman filter used to combine the accelerometer and gyro values.
-    kalmanY = kalmanFilterY(AccYangle, rate_gyr_y,LP)
-    kalmanX = kalmanFilterX(AccXangle, rate_gyr_x,LP)
+    temperature, pressure, altitude = bmp388.get_temperature_and_pressure_and_altitude()
+    pressure = pressure / 100.0
+    altitude = altitude / 100.0
 
-    temperature,pressure,altitude = bmp388.get_temperature_and_pressure_and_altitude()
-    pressure = pressure/100.0
-    altitude = altitude/100.0
+    outputString += "," + str(kalmanX)
+    outputString += "," + str(kalmanY)
+    outputString += "," + str(altitude)
+    outputString += "," + str(pressure)
+    outputString += "," + str(ACCx)
+    outputString += "," + str(ACCy)
+    outputString += "," + str(ACCz)
+    outputString += "," + str(GYRx)
+    outputString += "," + str(GYRy)
+    outputString += "," + str(GYRz)
+    outputString += "," + str(MAGx)
+    outputString += "," + str(MAGy)
+    outputString += "," + str(MAGz)
 
+    kalmanx_vector.append(kalmanX)
+    altitude_vector.append(altitude)
+    time_vector.append(float((a - starting_time).total_seconds()))
 
-    outputString += ","+str(kalmanX)
-    outputString += ","+str(kalmanY)
-    outputString += ","+str(altitude)
-    outputString += ","+str(pressure)
-    outputString += ","+str(ACCx)
-    outputString += ","+str(ACCy)
-    outputString += ","+str(ACCz)
-    outputString += ","+str(GYRx)
-    outputString += ","+str(GYRy)
-    outputString += ","+str(GYRz)
-    outputString += ","+str(MAGx)
-    outputString += ","+str(MAGy)
-    outputString += ","+str(MAGz)
-    
     print(outputString)
     string_list.append(outputString)
-    #slow program down a bit, makes the output more readable
+    # slow program down a bit, makes the output more readable
     time.sleep(0.03)
 
-
-
-with open('/home/mmidd/imu/test_code/output_test_' +str(random.randint(1, 999))+ '.csv', 'w') as file:
+with open('/home/mmidd/imu/test_code/output_log_' + str(datetime.datetime.now()) + '.csv', 'w') as file:
     for string in string_list:
         file.write(string + '\n')
-        
+
+kalmanx = np.array(kalmanx_vector)
+altitude = np.array(altitude_vector)
+time = np.array(time_vector)
+
+image2 = Image.open('/home/mmidd/imu/test_code/processing_data.png')
+disp.ShowImage(image2)
+
+# now post process data
+# first do angle measurement
+whittaker_smoother = WhittakerSmoother(lmbda=1.0e5, order=2, data_length=len(kalman_x))
+smoothed_kalman_x = whittaker_smoother.smooth(kalman_x)
+
+steady_state_angle = np.where(time > time[-1]-60.0, smoothed_kalman_x, 0.0)
+steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
+print(steady_state_angle)
+smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
+
+whittaker_smoother = WhittakerSmoother(lmbda=1000000, order=2, data_length=len(altitude))
+smoothed_alt = whittaker_smoother.smooth(altitude)
+
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
+ax.plot(time, smoothed_alt, color = 'blue')
+
+
+#combined metric
+tilt_threshold = -4.0 # degrees
+height_threshold = 1.4 # meters
+air_pressure_time_buffer = 2.5 #seconds
+rise_intervals = np.where(smoothed_kalman_x < tilt_threshold, smoothed_alt, 0.0)
+rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time, 0.0)
+rise_intervals_indices = np.where(smoothed_kalman_x < tilt_threshold, np.arange(len(smoothed_kalman_x)), 0.0)
+
+rise_intervals = extract_nonzero_segments(rise_intervals)
+rise_indices = extract_nonzero_segments(rise_intervals_indices)
+time_intervals = extract_nonzero_segments(rise_intervals_time)
+
+#extend intervals by time buffer
+for i in range(len(time_intervals)):
+    end_time_c = time_intervals[i][-1]
+    end_index = rise_indices[i][-1]
+    target_time_c = end_time_c + air_pressure_time_buffer
+    index = int(end_index)
+    while(time_intervals[i][-1] < target_time_c):
+        time_intervals[i] = np.append(time_intervals[i], time[index])
+        rise_intervals[i] = np.append(rise_intervals[i], smoothed_alt[index])
+        index += 1
+
+# do linear regression to find slope and average rise
+floor_increase_counter = 0
+floor_map ={0:'G', 1:'G1', 2:'1', 3:'2', 4:'3', 5:'4', 6:'5', 7:'6', 8:'7', 9:'8'}
+for i in range(len(time_intervals)):
+    # linear least squares to find average trend of rise points:
+    X = np.array([time_intervals[i], np.ones(len(time_intervals[i]))]).transpose()
+    y = np.array(rise_intervals[i]).transpose()
+
+    B = np.matmul(np.matmul(np.linalg.inv(np.matmul(X.transpose(), X)), X.transpose()), y)
+    print(B)
+
+    plot_x = time_intervals[i]
+    plot_y = []
+    for x in plot_x:
+        plot_y.append(B[0]*x + B[1])
+
+    ax.plot(plot_x, plot_y, color = 'green')
+
+    if(plot_y[-1] - plot_y[0] > height_threshold):
+        floor_increase_counter += 1
+        ax.plot([time_intervals[i][0], time_intervals[i][-1]],[rise_intervals[i].mean(), rise_intervals[i].mean()], color = 'red')
+
+ax.text(350,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
+fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
+
+
+image2 = Image.open('/home/mmidd/imu/test_code/data_plot.png')
+disp.ShowImage(image2)
+
+time.sleep(40.0)
+disp.module_exit()
+
 time.sleep(5.0)
-#os.system("sudo shutdown now")
-        
+# os.system("sudo shutdown now")
