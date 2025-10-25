@@ -6,7 +6,7 @@ import os
 import sys
 import smbus
 
-from whittaker_eilers import WhittakerSmoother
+#from whittaker_eilers import WhittakerSmoother
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -436,6 +436,7 @@ disp.ShowImage(image2)
 
 # now post process data
 # first do angle measurement
+'''
 whittaker_smoother = WhittakerSmoother(lmbda=1.0e5, order=2, data_length=len(kalman_x))
 smoothed_kalman_x = whittaker_smoother.smooth(kalman_x)
 
@@ -503,7 +504,7 @@ fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_
 
 image2 = Image.open('/home/mmidd/imu/test_code/data_plot.png')
 disp.ShowImage(image2)
-
+'''
 time.sleep(40.0)
 disp.module_exit()
 
