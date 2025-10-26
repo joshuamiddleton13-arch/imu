@@ -369,7 +369,7 @@ kalmanx_vector = []
 altitude_vector = []
 time_vector = []
 
-while time_count < 20.0:
+while time_count < 360.0:
 
     # Read the accelerometer,gyroscope and magnetometer values
     ACCx = IMU.readACCx()
@@ -538,4 +538,4 @@ time.sleep(40.0)
 disp.module_exit()
 
 time.sleep(10.0)
-# os.system("sudo shutdown now")
+os.system("sudo shutdown now")
