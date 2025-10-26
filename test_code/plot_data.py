@@ -15,6 +15,8 @@ matplotlib.use('TkAgg')
 from whittaker_eilers import WhittakerSmoother
 
 
+
+
 def extract_nonzero_segments(vec):
     """
     Extract nonzero segments from a numpy vector.
@@ -227,21 +229,28 @@ for i in range(len(time)):
 
 print(df)
 
+def moving_average(data, window_size):
+    box = np.ones(window_size) / window_size
+    return np.convolve(data, box, mode='same')
+
+
 
 # first do angle measurement
 whittaker_smoother = WhittakerSmoother(lmbda=1.0e5, order=2, data_length=len(kalman_x))
 smoothed_kalman_x = whittaker_smoother.smooth(kalman_x)
+smoothed_kalman_x = moving_average(kalman_x, 35)
 
 steady_state_angle = np.where(time > time[-1]-60.0, smoothed_kalman_x, 0.0)
 steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 print(steady_state_angle)
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
 
-#plt.figure()
-#plt.plot(time, smoothed_kalman_x)
+plt.figure()
+plt.plot(time, smoothed_kalman_x)
 
 whittaker_smoother = WhittakerSmoother(lmbda=1000000, order=2, data_length=len(df["Altitude"].to_numpy()))
 smoothed_alt = whittaker_smoother.smooth(df["Altitude"].to_numpy())
+smoothed_alt = moving_average(df["Altitude"].to_numpy(), 35)
 
 #plt.figure()
 #plt.plot(time, smoothed_alt, color = 'blue')
@@ -253,8 +262,8 @@ ax.plot(time, smoothed_alt, color = 'blue')
 
 #combined metric
 tilt_threshold = -4.0 # degrees
-height_threshold = 1.4 # meters
-air_pressure_time_buffer = 2.5 #seconds
+height_threshold = 1.55 # meters
+air_pressure_time_buffer = 2.25 #seconds
 rise_intervals = np.where(smoothed_kalman_x < tilt_threshold, smoothed_alt, 0.0)
 rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time, 0.0)
 rise_intervals_indices = np.where(smoothed_kalman_x < tilt_threshold, np.arange(len(smoothed_kalman_x)), 0.0)
@@ -299,19 +308,20 @@ for i in range(len(time_intervals)):
 
 ax.text(500,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
 fig.savefig("data_plot.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
-#plt.show()
+plt.show()
 
 # make some images for ops code:
 fig, ax = plt.subplots(figsize=(2.4, 3.2))
 fig.subplots_adjust(0, 0, 1, 1)
 
-ax.text(.5,.5,"Collecting Data", ha='center', fontsize=14, family="monospace")
-ax.axis('off')
-fig.savefig("collecting_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
 
-fig, ax = plt.subplots(figsize=(2.4, 3.2))
-fig.subplots_adjust(0, 0, 1, 1)
-
-ax.text(.5,.5,"Processing Data", ha='center', fontsize=14, family="monospace")
-ax.axis('off')
-fig.savefig("processing_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+#ax.text(.5,.5,"Collecting Data", ha='center', fontsize=14, family="monospace")
+#ax.axis('off')
+#fig.savefig("collecting_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+#
+#fig, ax = plt.subplots(figsize=(2.4, 3.2))
+#fig.subplots_adjust(0, 0, 1, 1)
+#
+#ax.text(.5,.5,"Processing Data", ha='center', fontsize=14, family="monospace")
+#ax.axis('off')
+#fig.savefig("processing_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)

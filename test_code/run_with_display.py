@@ -6,7 +6,7 @@ import os
 import sys
 import smbus
 
-#from whittaker_eilers import WhittakerSmoother
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,6 +18,10 @@ from PIL import Image,ImageDraw,ImageFont
 
 # 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
 
+
+def moving_average(data, window_size):
+    box = np.ones(window_size) / window_size
+    return np.convolve(data, box, mode='same')
 
 # define BMP388 Device I2C address
 I2C_ADD_BMP388_AD0_LOW = 0x76
@@ -436,17 +440,17 @@ disp.ShowImage(image2)
 
 # now post process data
 # first do angle measurement
-'''
-whittaker_smoother = WhittakerSmoother(lmbda=1.0e5, order=2, data_length=len(kalman_x))
-smoothed_kalman_x = whittaker_smoother.smooth(kalman_x)
+
+
+smoothed_kalman_x = moving_average(kalmanx, 35)
 
 steady_state_angle = np.where(time_v > time_v[-1]-60.0, smoothed_kalman_x, 0.0)
 steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 print(steady_state_angle)
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
 
-whittaker_smoother = WhittakerSmoother(lmbda=1000000, order=2, data_length=len(altitude))
-smoothed_alt = whittaker_smoother.smooth(altitude)
+
+smoothed_alt = moving_average(altitude, 35)
 
 fig, ax = plt.subplots(figsize=(2.4, 3.2))
 fig.subplots_adjust(0, 0, 1, 1)
@@ -455,8 +459,8 @@ ax.plot(time, smoothed_alt, color = 'blue')
 
 #combined metric
 tilt_threshold = -4.0 # degrees
-height_threshold = 1.4 # meters
-air_pressure_time_buffer = 2.5 #seconds
+height_threshold = 1.65 # meters
+air_pressure_time_buffer = 2.25 #seconds
 rise_intervals = np.where(smoothed_kalman_x < tilt_threshold, smoothed_alt, 0.0)
 rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time_v, 0.0)
 rise_intervals_indices = np.where(smoothed_kalman_x < tilt_threshold, np.arange(len(smoothed_kalman_x)), 0.0)
@@ -504,9 +508,9 @@ fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_
 
 image2 = Image.open('/home/mmidd/imu/test_code/data_plot.png')
 disp.ShowImage(image2)
-'''
+
 time.sleep(40.0)
 disp.module_exit()
 
-time.sleep(5.0)
+time.sleep(10.0)
 # os.system("sudo shutdown now")
