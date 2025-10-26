@@ -454,7 +454,7 @@ smoothed_alt = moving_average(altitude, 35)
 
 fig, ax = plt.subplots(figsize=(2.4, 3.2))
 fig.subplots_adjust(0, 0, 1, 1)
-ax.plot(time, smoothed_alt, color = 'blue')
+ax.plot(time_v, smoothed_alt, color = 'blue')
 
 
 #combined metric
