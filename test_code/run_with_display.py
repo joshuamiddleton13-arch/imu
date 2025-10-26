@@ -524,8 +524,14 @@ for i in range(len(time_intervals)):
 ax.text(10,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
 fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
 
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
 
-image2 = Image.open('/home/mmidd/imu/test_code/data_plot.png')
+ax.text(.5,.5,str(floor_map[floor_increase_counter]), ha='center', fontsize=20, family="monospace")
+ax.axis('off')
+fig.savefig('/home/mmidd/imu/test_code/data_out.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
+
+image2 = Image.open('/home/mmidd/imu/test_code/data_out.png')
 disp.ShowImage(image2)
 
 time.sleep(40.0)
