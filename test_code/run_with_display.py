@@ -521,7 +521,7 @@ for i in range(len(time_intervals)):
         floor_increase_counter += 1
         ax.plot([time_intervals[i][0], time_intervals[i][-1]],[rise_intervals[i].mean(), rise_intervals[i].mean()], color = 'red')
 
-ax.text(30,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
+ax.text(10,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
 fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
 
 
