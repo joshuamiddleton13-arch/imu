@@ -314,7 +314,7 @@ disp.Init()
 # Clear display.
 disp.clear()
 #Set the backlight to 100
-disp.bl_DutyCycle(50)
+disp.bl_DutyCycle(100)
 image = Image.open('/home/mmidd/imu/test_code/collecting_data.png')
 disp.ShowImage(image)
 
@@ -429,7 +429,7 @@ with open('/home/mmidd/imu/test_code/output_log_' + str(datetime.datetime.now())
 
 kalmanx = np.array(kalmanx_vector)
 altitude = np.array(altitude_vector)
-time = np.array(time_vector)
+time_v = np.array(time_vector)
 
 image2 = Image.open('/home/mmidd/imu/test_code/processing_data.png')
 disp.ShowImage(image2)
@@ -440,7 +440,7 @@ disp.ShowImage(image2)
 whittaker_smoother = WhittakerSmoother(lmbda=1.0e5, order=2, data_length=len(kalman_x))
 smoothed_kalman_x = whittaker_smoother.smooth(kalman_x)
 
-steady_state_angle = np.where(time > time[-1]-60.0, smoothed_kalman_x, 0.0)
+steady_state_angle = np.where(time_v > time_v[-1]-60.0, smoothed_kalman_x, 0.0)
 steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 print(steady_state_angle)
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
@@ -458,7 +458,7 @@ tilt_threshold = -4.0 # degrees
 height_threshold = 1.4 # meters
 air_pressure_time_buffer = 2.5 #seconds
 rise_intervals = np.where(smoothed_kalman_x < tilt_threshold, smoothed_alt, 0.0)
-rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time, 0.0)
+rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time_v, 0.0)
 rise_intervals_indices = np.where(smoothed_kalman_x < tilt_threshold, np.arange(len(smoothed_kalman_x)), 0.0)
 
 rise_intervals = extract_nonzero_segments(rise_intervals)
@@ -472,7 +472,7 @@ for i in range(len(time_intervals)):
     target_time_c = end_time_c + air_pressure_time_buffer
     index = int(end_index)
     while(time_intervals[i][-1] < target_time_c):
-        time_intervals[i] = np.append(time_intervals[i], time[index])
+        time_intervals[i] = np.append(time_intervals[i], time_v[index])
         rise_intervals[i] = np.append(rise_intervals[i], smoothed_alt[index])
         index += 1
 
