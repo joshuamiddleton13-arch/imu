@@ -18,19 +18,7 @@ from whittaker_eilers import WhittakerSmoother
 
 
 def extract_nonzero_segments(vec):
-    """
-    Extract nonzero segments from a numpy vector.
 
-    Parameters:
-    -----------
-    vec : numpy array
-        Input vector
-
-    Returns:
-    --------
-    list of numpy arrays
-        List containing each nonzero segment as a separate array
-    """
     # Find indices where values are nonzero
     nonzero_mask = vec != 0
 

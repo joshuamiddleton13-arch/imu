@@ -23,6 +23,25 @@ def moving_average(data, window_size):
     box = np.ones(window_size) / window_size
     return np.convolve(data, box, mode='same')
 
+def extract_nonzero_segments(vec):
+
+    # Find indices where values are nonzero
+    nonzero_mask = vec != 0
+
+    # Find the start and end of each nonzero segment
+    # Pad with False to handle segments at boundaries
+    padded = np.concatenate(([False], nonzero_mask, [False]))
+
+    # Find where segments start and end
+    diff = np.diff(padded.astype(int))
+    starts = np.where(diff == 1)[0]
+    ends = np.where(diff == -1)[0]
+
+    # Extract each segment
+    segments = [vec[start:end] for start, end in zip(starts, ends)]
+
+    return segments
+
 # define BMP388 Device I2C address
 I2C_ADD_BMP388_AD0_LOW = 0x76
 I2C_ADD_BMP388_AD0_HIGH = 0x77
