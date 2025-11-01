@@ -296,11 +296,11 @@ for i in range(len(time_intervals)):
 
 ax.text(500,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
 fig.savefig("data_plot.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
-plt.show()
+#plt.show()
 
 # make some images for ops code:
-fig, ax = plt.subplots(figsize=(2.4, 3.2))
-fig.subplots_adjust(0, 0, 1, 1)
+#fig, ax = plt.subplots(figsize=(2.4, 3.2))
+#fig.subplots_adjust(0, 0, 1, 1)
 
 
 #ax.text(.5,.5,"Collecting Data", ha='center', fontsize=14, family="monospace")
@@ -313,3 +313,32 @@ fig.subplots_adjust(0, 0, 1, 1)
 #ax.text(.5,.5,"Processing Data", ha='center', fontsize=14, family="monospace")
 #ax.axis('off')
 #fig.savefig("processing_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+
+plt.figure()
+plt.plot(time, Ax)
+
+
+# Create a sample signal
+#t = np.arange(256)
+
+#signal = np.sin(2 * np.pi * t / 32) + 0.5 * np.sin(2 * np.pi * t / 8)
+print(len(Ax))
+print((time[9000]))
+print(time[9256])
+signal = Ax[9000:9256]
+N = len(signal)
+T = .04698
+
+# Compute the FFT of the signal
+fft_result = np.fft.fft(signal)
+
+# Compute the frequencies corresponding to the FFT result
+freq = np.fft.fftfreq(N, T)
+magnitude = np.abs(fft_result)
+# Plot the real and imaginary parts of the FFT result
+plt.figure()
+plt.stem(freq[:N//2], magnitude[:N//2])
+plt.xlabel('Frequency')
+plt.ylabel('Magnitude')
+plt.legend()
+plt.show()
