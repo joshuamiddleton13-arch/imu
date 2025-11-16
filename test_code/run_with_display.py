@@ -526,4 +526,4 @@ time.sleep(40.0)
 disp.module_exit()
 
 time.sleep(10.0)
-os.system("sudo shutdown now")
+#os.system("sudo shutdown now")
