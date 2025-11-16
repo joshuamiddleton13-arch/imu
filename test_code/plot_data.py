@@ -149,7 +149,8 @@ CFangleY = 0.0
 kalmanX = 0.0
 kalmanY = 0.0
 
-df = pd.read_csv("output_test_initial.csv")
+#df = pd.read_csv("output_test_initial.csv")
+df = pd.read_csv(r"C:\Users\mmidd\Downloads\output_log_2025-11_15_run.csv")
 
 time = df["Time"].to_numpy()
 Ax = df["AccX"].to_numpy()
@@ -233,8 +234,8 @@ steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 print(steady_state_angle)
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
 
-plt.figure()
-plt.plot(time, smoothed_kalman_x)
+#plt.figure()
+#plt.plot(time, smoothed_kalman_x)
 
 whittaker_smoother = WhittakerSmoother(lmbda=1000000, order=2, data_length=len(df["Altitude"].to_numpy()))
 smoothed_alt = whittaker_smoother.smooth(df["Altitude"].to_numpy())
@@ -242,7 +243,7 @@ smoothed_alt = moving_average(df["Altitude"].to_numpy(), 35)
 
 #plt.figure()
 #plt.plot(time, smoothed_alt, color = 'blue')
-
+'''
 fig, ax = plt.subplots(figsize=(2.4, 3.2))
 fig.subplots_adjust(0, 0, 1, 1)
 ax.plot(time, smoothed_alt, color = 'blue')
@@ -296,49 +297,75 @@ for i in range(len(time_intervals)):
 
 ax.text(500,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
 fig.savefig("data_plot.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
-#plt.show()
+'''
 
 # make some images for ops code:
 #fig, ax = plt.subplots(figsize=(2.4, 3.2))
 #fig.subplots_adjust(0, 0, 1, 1)
-
-
 #ax.text(.5,.5,"Collecting Data", ha='center', fontsize=14, family="monospace")
 #ax.axis('off')
 #fig.savefig("collecting_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
 #
-#fig, ax = plt.subplots(figsize=(2.4, 3.2))
-#fig.subplots_adjust(0, 0, 1, 1)
-#
-#ax.text(.5,.5,"Processing Data", ha='center', fontsize=14, family="monospace")
-#ax.axis('off')
-#fig.savefig("processing_data.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+fig, ax = plt.subplots(figsize=(2.4, 3.2))
+fig.subplots_adjust(0, 0, 1, 1)
 
-plt.figure()
-plt.plot(time, Ax)
+ax.text(.5,.5,"Not at Home", ha='center', fontsize=14, family="monospace")
+ax.axis('off')
+fig.savefig("not_at_home.png", bbox_inches='tight', pad_inches=0, dpi=100.0)
+
+#plt.figure()
+#plt.plot(time, Ax)
 
 
 # Create a sample signal
 #t = np.arange(256)
 
 #signal = np.sin(2 * np.pi * t / 32) + 0.5 * np.sin(2 * np.pi * t / 8)
-print(len(Ax))
-print((time[9000]))
-print(time[9256])
-signal = Ax[9000:9256]
-N = len(signal)
-T = .04698
+print(len(Ay))
+start_window = 0
+print(time)
 
-# Compute the FFT of the signal
-fft_result = np.fft.fft(signal)
+cut_index = np.argmax(time > time[-1]-300.0)
+print(time[cut_index:])
 
-# Compute the frequencies corresponding to the FFT result
-freq = np.fft.fftfreq(N, T)
-magnitude = np.abs(fft_result)
-# Plot the real and imaginary parts of the FFT result
-plt.figure()
-plt.stem(freq[:N//2], magnitude[:N//2])
-plt.xlabel('Frequency')
-plt.ylabel('Magnitude')
-plt.legend()
+
+time_windows = []
+vibration_score = []
+start_window = 0
+
+while(start_window < len(Ay)-257):
+    end_window = start_window + 256
+    #print((time[start_window]))
+    #print(time[end_window])
+    time_windows.append(time[start_window])
+
+    signal = Ay[start_window:end_window]
+    N = len(signal)
+    T = (time[end_window] - time[start_window])/256.0
+
+    # Compute the FFT of the signal
+    fft_result = np.fft.fft(signal)
+
+    # Compute the frequencies corresponding to the FFT result
+    freq = np.fft.fftfreq(N, T)
+    magnitude = np.abs(fft_result)
+
+    vibration_score.append(np.sum(magnitude[4:N//2]))
+
+    # Plot the real and imaginary parts of the FFT result
+    #print(freq[5:N//2])
+    #print(magnitude[5:N//2])
+    #plt.figure()
+    #plt.stem(freq[5:N//2], magnitude[5:N//2])
+    #plt.xlabel('Frequency')
+    #plt.ylabel('Magnitude')
+    #plt.ylim(0,10000)
+    #plt.legend()
+    #plt.show()
+
+    start_window += 256
+
+#print(vibration_score)
+plt.figure
+plt.plot(time_windows, vibration_score)
 plt.show()

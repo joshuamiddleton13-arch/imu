@@ -13,31 +13,6 @@ sys.path.append("..")
 from lib import LCD_2inch
 from PIL import Image,ImageDraw,ImageFont
 
-# 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
-
-
-def moving_average(data, window_size):
-    box = np.ones(window_size) / window_size
-    return np.convolve(data, box, mode='same')
-
-def extract_nonzero_segments(vec):
-
-    # Find indices where values are nonzero
-    nonzero_mask = vec != 0
-
-    # Find the start and end of each nonzero segment
-    # Pad with False to handle segments at boundaries
-    padded = np.concatenate(([False], nonzero_mask, [False]))
-
-    # Find where segments start and end
-    diff = np.diff(padded.astype(int))
-    starts = np.where(diff == 1)[0]
-    ends = np.where(diff == -1)[0]
-
-    # Extract each segment
-    segments = [vec[start:end] for start, end in zip(starts, ends)]
-
-    return segments
 
 # define BMP388 Device I2C address
 I2C_ADD_BMP388_AD0_LOW = 0x76
@@ -96,6 +71,34 @@ BMP388_REG_ADD_P9_MSB = 0x43
 BMP388_REG_ADD_P10 = 0x44
 BMP388_REG_ADD_P11 = 0x45
 
+RAD_TO_DEG = 57.29578
+M_PI = 3.14159265358979323846
+G_GAIN = 0.070  # [deg/s/LSB]  If you change the dps for gyro, you need to update this value accordingly
+AA = 0.40  # Complementary filter constant
+
+magXmin = 0
+magYmin = 0
+magZmin = 0
+magXmax = 0
+magYmax = 0
+magZmax = 0
+
+# Kalman filter variables
+Q_angle = 0.01
+Q_gyro = 0.0015
+R_angle = 0.005
+y_bias = 0.0
+x_bias = 0.0
+XP_00 = 0.0
+XP_01 = 0.0
+XP_10 = 0.0
+XP_11 = 0.0
+YP_00 = 0.0
+YP_01 = 0.0
+YP_10 = 0.0
+YP_11 = 0.0
+KFangleX = 0.0
+KFangleY = 0.0
 
 class BMP388(object):
     """docstring for BMP388"""
@@ -220,36 +223,28 @@ class BMP388(object):
 
         return (temperature, pressure, altitude)
 
+def moving_average(data, window_size):
+    box = np.ones(window_size) / window_size
+    return np.convolve(data, box, mode='same')
 
-RAD_TO_DEG = 57.29578
-M_PI = 3.14159265358979323846
-G_GAIN = 0.070  # [deg/s/LSB]  If you change the dps for gyro, you need to update this value accordingly
-AA = 0.40  # Complementary filter constant
+def extract_nonzero_segments(vec):
 
-magXmin = 0
-magYmin = 0
-magZmin = 0
-magXmax = 0
-magYmax = 0
-magZmax = 0
+    # Find indices where values are nonzero
+    nonzero_mask = vec != 0
 
-# Kalman filter variables
-Q_angle = 0.01
-Q_gyro = 0.0015
-R_angle = 0.005
-y_bias = 0.0
-x_bias = 0.0
-XP_00 = 0.0
-XP_01 = 0.0
-XP_10 = 0.0
-XP_11 = 0.0
-YP_00 = 0.0
-YP_01 = 0.0
-YP_10 = 0.0
-YP_11 = 0.0
-KFangleX = 0.0
-KFangleY = 0.0
+    # Find the start and end of each nonzero segment
+    # Pad with False to handle segments at boundaries
+    padded = np.concatenate(([False], nonzero_mask, [False]))
 
+    # Find where segments start and end
+    diff = np.diff(padded.astype(int))
+    starts = np.where(diff == 1)[0]
+    ends = np.where(diff == -1)[0]
+
+    # Extract each segment
+    segments = [vec[start:end] for start, end in zip(starts, ends)]
+
+    return segments
 
 def kalmanFilterY(accAngle, gyroRate, DT):
     y = 0.0
@@ -286,7 +281,6 @@ def kalmanFilterY(accAngle, gyroRate, DT):
 
     return KFangleY
 
-
 def kalmanFilterX(accAngle, gyroRate, DT):
     x = 0.0
     S = 0.0
@@ -322,6 +316,13 @@ def kalmanFilterX(accAngle, gyroRate, DT):
 
     return KFangleX
 
+
+######################################################################################################
+save_csv_log = False
+
+
+######################################################################################################
+
 # setup code for display:
 RST = 27
 DC = 25
@@ -335,8 +336,8 @@ disp.Init()
 disp.clear()
 #Set the backlight to 100
 disp.bl_DutyCycle(100)
-image = Image.open('/home/mmidd/imu/test_code/collecting_data.png')
-disp.ShowImage(image)
+image_collecting = Image.open('/home/mmidd/imu/test_code/collecting_data.png')
+disp.ShowImage(image_collecting)
 
 #setup code for imu:
 IMU.detectIMU()  # Detect if BerryIMU is connected.
@@ -352,21 +353,25 @@ gyroZangle = 0.0
 kalmanX = 0.0
 kalmanY = 0.0
 
-a = datetime.datetime.now()
-starting_time = datetime.datetime.now()
-
-time_count = 0
+cwd = os.getcwd()
+bmp388 = BMP388()
 
 string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
-cwd = os.getcwd()
 
-bmp388 = BMP388()
+time_count = 0
+a = datetime.datetime.now()
+starting_time = datetime.datetime.now()
 
 kalmanx_vector = []
 altitude_vector = []
 time_vector = []
 
-while time_count < 360.0:
+car_parked = False
+fft_buffer = []
+fft_time_buffer = []
+consecutive_count = 0
+
+while car_parked == False:
 
     # Read the accelerometer,gyroscope and magnetometer values
     ACCx = IMU.readACCx()
@@ -383,27 +388,22 @@ while time_count < 360.0:
     # outputString = "Loop Time %5.2f " % ( LP )
     outputString = str((a - starting_time).total_seconds())
     time_count += b.total_seconds()
-
     # Convert Gyro raw to degrees per second
     rate_gyr_x = GYRx * G_GAIN
     rate_gyr_y = GYRy * G_GAIN
     rate_gyr_z = GYRz * G_GAIN
-
     # Calculate the angles from the gyro.
     gyroXangle += rate_gyr_x * LP
     gyroYangle += rate_gyr_y * LP
     gyroZangle += rate_gyr_z * LP
-
     # Convert Accelerometer values to degrees
     AccXangle = (math.atan2(ACCy, ACCz) * RAD_TO_DEG)
     AccYangle = (math.atan2(ACCz, ACCx) + M_PI) * RAD_TO_DEG
-
     # convert the values to -180 and +180
     if AccYangle > 90:
         AccYangle -= 270.0
     else:
         AccYangle += 90.0
-
     # Kalman filter used to combine the accelerometer and gyro values.
     kalmanY = kalmanFilterY(AccYangle, rate_gyr_y, LP)
     kalmanX = kalmanFilterX(AccXangle, rate_gyr_x, LP)
@@ -411,50 +411,78 @@ while time_count < 360.0:
     temperature, pressure, altitude = bmp388.get_temperature_and_pressure_and_altitude()
     pressure = pressure / 100.0
     altitude = altitude / 100.0
-
-    outputString += "," + str(kalmanX)
-    outputString += "," + str(kalmanY)
-    outputString += "," + str(altitude)
-    outputString += "," + str(pressure)
-    outputString += "," + str(ACCx)
-    outputString += "," + str(ACCy)
-    outputString += "," + str(ACCz)
-    outputString += "," + str(GYRx)
-    outputString += "," + str(GYRy)
-    outputString += "," + str(GYRz)
-    string_list.append(outputString)
-
+    if(save_csv_log):
+        outputString += "," + str(kalmanX)
+        outputString += "," + str(kalmanY)
+        outputString += "," + str(altitude)
+        outputString += "," + str(pressure)
+        outputString += "," + str(ACCx)
+        outputString += "," + str(ACCy)
+        outputString += "," + str(ACCz)
+        outputString += "," + str(GYRx)
+        outputString += "," + str(GYRy)
+        outputString += "," + str(GYRz)
+        string_list.append(outputString)
 
     kalmanx_vector.append(kalmanX)
     altitude_vector.append(altitude)
     time_vector.append(float((a - starting_time).total_seconds()))
 
-    time.sleep(0.0025)
+    #check if parked
+    fft_buffer.append(ACCy)
+    fft_time_buffer.append((a - starting_time).total_seconds())
+    if(len(fft_buffer) == 256):
+        signal = fft_buffer
+        N = len(signal)
+        T = (fft_time_buffer[-1] - fft_time_buffer[0]) / 256.0
+        # Compute the FFT of the signal
+        fft_result = np.fft.fft(signal)
+        # Compute the frequencies corresponding to the FFT result
+        #freq = np.fft.fftfreq(N, T)
+        magnitude = np.abs(fft_result)
 
-with open('/home/mmidd/imu/test_code/output_log_' + str(datetime.datetime.now()) + '.csv', 'w') as file:
-    for string in string_list:
-        file.write(string + '\n')
+        vibration_score = np.sum(magnitude[4:N // 2])
+        if(vibration_score < 38000):
+            consecutive_count += 1
+        else:
+            consecutive_count = 0
+        if(consecutive_count > 5):
+            car_parked = True
+            image_parked = Image.open('/home/mmidd/imu/test_code/car_parked.png')
+            disp.ShowImage(image_parked)
+            time.sleep(6.0)
+
+        fft_buffer = []
+        fft_time_buffer = []
+
+    time.sleep(0.001)
+
+if(save_csv_log):
+    with open('/home/mmidd/imu/test_code/output_log_' + str(datetime.datetime.now()) + '.csv', 'w') as file:
+        for string in string_list:
+            file.write(string + '\n')
+
+
+image_processing = Image.open('/home/mmidd/imu/test_code/processing_data.png')
+disp.ShowImage(image_processing)
 
 kalmanx = np.array(kalmanx_vector)
 altitude = np.array(altitude_vector)
 time_v = np.array(time_vector)
 
-image2 = Image.open('/home/mmidd/imu/test_code/processing_data.png')
-disp.ShowImage(image2)
-
+# look at only the prior 6 minutes of data or less
+end_time = time_v[-1]
+cut_index = np.argmax(time > end_time-360.0)
+kalmanx = kalmanx[cut_index:]
+altitude = altitude[altitude:]
+time_v = time_v[cut_index:]
 
 # now post process data
 smoothed_kalman_x = moving_average(kalmanx, 35)
-steady_state_angle = np.where(time_v > time_v[-1]-60.0, smoothed_kalman_x, 0.0)
+steady_state_angle = np.where(time_v > time_v[-1]-20.0, smoothed_kalman_x, 0.0)
 steady_state_angle = steady_state_angle[steady_state_angle != 0].mean()
 smoothed_kalman_x = smoothed_kalman_x - steady_state_angle
 smoothed_alt = moving_average(altitude, 35)
-
-fig, ax = plt.subplots(figsize=(2.4, 3.2))
-fig.subplots_adjust(0, 0, 1, 1)
-ax.plot(time_v, smoothed_alt, color = 'blue')
-
-
 #combined metric
 tilt_threshold = -4.0 # degrees
 height_threshold = 1.65 # meters
@@ -462,11 +490,9 @@ air_pressure_time_buffer = 2.25 #seconds
 rise_intervals = np.where(smoothed_kalman_x < tilt_threshold, smoothed_alt, 0.0)
 rise_intervals_time = np.where(smoothed_kalman_x < tilt_threshold, time_v, 0.0)
 rise_intervals_indices = np.where(smoothed_kalman_x < tilt_threshold, np.arange(len(smoothed_kalman_x)), 0.0)
-
 rise_intervals = extract_nonzero_segments(rise_intervals)
 rise_indices = extract_nonzero_segments(rise_intervals_indices)
 time_intervals = extract_nonzero_segments(rise_intervals_time)
-
 #extend intervals by time buffer
 for i in range(len(time_intervals)):
     end_time_c = time_intervals[i][-1]
@@ -485,36 +511,44 @@ for i in range(len(time_intervals)):
     # linear least squares to find average trend of rise points:
     X = np.array([time_intervals[i], np.ones(len(time_intervals[i]))]).transpose()
     y = np.array(rise_intervals[i]).transpose()
-
     B = np.matmul(np.matmul(np.linalg.inv(np.matmul(X.transpose(), X)), X.transpose()), y)
-    print(B)
-
     plot_x = time_intervals[i]
     plot_y = []
     for x in plot_x:
         plot_y.append(B[0]*x + B[1])
 
-    ax.plot(plot_x, plot_y, color = 'green')
-
     if(plot_y[-1] - plot_y[0] > height_threshold):
         floor_increase_counter += 1
-        ax.plot([time_intervals[i][0], time_intervals[i][-1]],[rise_intervals[i].mean(), rise_intervals[i].mean()], color = 'red')
 
-ax.text(10,np.array(smoothed_alt).mean(),floor_map[floor_increase_counter], ha='center', fontsize=25, family="monospace")
-fig.savefig('/home/mmidd/imu/test_code/data_plot.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
+if(floor_increase_counter > 0):
+    #send floor result
+    try:
+        floor_result = floor_map[floor_increase_counter]
+    except:
+        floor_result = 99
 
-fig, ax = plt.subplots(figsize=(2.4, 3.2))
-fig.subplots_adjust(0, 0, 1, 1)
+    fig, ax = plt.subplots(figsize=(2.4, 3.2))
+    fig.subplots_adjust(0, 0, 1, 1)
+    ax.text(.5,.5,str(floor_result), ha='center', fontsize=20, family="monospace")
+    ax.axis('off')
+    fig.savefig('/home/mmidd/imu/test_code/data_out.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
 
-ax.text(.5,.5,str(floor_map[floor_increase_counter]), ha='center', fontsize=20, family="monospace")
-ax.axis('off')
-fig.savefig('/home/mmidd/imu/test_code/data_out.png', bbox_inches='tight', pad_inches=0, dpi=100.0)
+    image_result = Image.open('/home/mmidd/imu/test_code/data_out.png')
+    disp.ShowImage(image_result)
 
-image2 = Image.open('/home/mmidd/imu/test_code/data_out.png')
-disp.ShowImage(image2)
 
-time.sleep(40.0)
+else:
+    image_result = Image.open('/home/mmidd/imu/test_code/not_at_home.png')
+    disp.ShowImage(image_result)
+
+
+
+
+time.sleep(15.0)
+# now close program and shut down
 disp.module_exit()
 
-time.sleep(10.0)
+time.sleep(5.0)
 #os.system("sudo shutdown now")
+
+
