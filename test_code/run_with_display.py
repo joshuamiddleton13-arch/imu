@@ -360,7 +360,7 @@ starting_time = datetime.datetime.now()
 
 time_count = 0
 
-string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,MagX,MagY,MagZ"]
+string_list = ["Time,KalmanX,KalmanY,Altitude,Pressure,AccX,AccY,AccZ,GyrX,GyrY,GyrZ"]
 cwd = os.getcwd()
 
 bmp388 = BMP388()
@@ -378,14 +378,6 @@ while time_count < 360.0:
     GYRx = IMU.readGYRx()
     GYRy = IMU.readGYRy()
     GYRz = IMU.readGYRz()
-    MAGx = IMU.readMAGx()
-    MAGy = IMU.readMAGy()
-    MAGz = IMU.readMAGz()
-
-    # Apply compass calibration
-    MAGx -= (magXmin + magXmax) / 2
-    MAGy -= (magYmin + magYmax) / 2
-    MAGz -= (magZmin + magZmax) / 2
 
     ##Calculate loop Period(LP). How long between Gyro Reads
     b = datetime.datetime.now() - a
@@ -433,18 +425,14 @@ while time_count < 360.0:
     outputString += "," + str(GYRx)
     outputString += "," + str(GYRy)
     outputString += "," + str(GYRz)
-    outputString += "," + str(MAGx)
-    outputString += "," + str(MAGy)
-    outputString += "," + str(MAGz)
 
     kalmanx_vector.append(kalmanX)
     altitude_vector.append(altitude)
     time_vector.append(float((a - starting_time).total_seconds()))
 
-    print(outputString)
     string_list.append(outputString)
     # slow program down a bit, makes the output more readable
-    time.sleep(0.03)
+    time.sleep(0.0025)
 
 with open('/home/mmidd/imu/test_code/output_log_' + str(datetime.datetime.now()) + '.csv', 'w') as file:
     for string in string_list:
