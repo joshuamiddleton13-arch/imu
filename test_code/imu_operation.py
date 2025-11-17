@@ -12,6 +12,8 @@ import spidev as SPI
 sys.path.append("..")
 from lib import LCD_2inch
 from PIL import Image,ImageDraw,ImageFont
+import serial
+
 
 
 # define BMP388 Device I2C address
@@ -346,6 +348,13 @@ if (IMU.BerryIMUversion == 99):
     sys.exit()
 IMU.initIMU()  # Initialise the accelerometer, gyroscope and compass
 
+# setup cell modem
+ser = serial.Serial("/dev/ttyUSB2", 115200)
+ser.flushInput()
+phone_number = '13152476985'
+rec_buff = ''
+
+
 # logging variables:
 gyroXangle = 0.0
 gyroYangle = 0.0
@@ -536,19 +545,30 @@ if(floor_increase_counter > 0):
     image_result = Image.open('/home/mmidd/imu/test_code/data_out.png')
     disp.ShowImage(image_result)
 
+    text_message = 'Floor Parked: ' + str(floor_result)
+    command = "AT+CMGF=1"
+    ser.write((command+'\r\n').encode())
+    time.sleep(1.0)
+    command = "AT+CMGS=\""+phone_number+"\""
+    ser.write((command+'\r\n').encode())
+    time.sleep(1.0)
+    ser.write(text_message.encode())
+    time.sleep(2.0)
+    ser.write(b'\x1A')
+    time.sleep(5.0)
 
 else:
     image_result = Image.open('/home/mmidd/imu/test_code/not_at_home.png')
     disp.ShowImage(image_result)
 
 
-
-
 time.sleep(15.0)
 # now close program and shut down
 disp.module_exit()
+time.sleep(2.0)
+ser.close()
 
 time.sleep(5.0)
-#os.system("sudo shutdown now")
+os.system("sudo shutdown now")
 
 
